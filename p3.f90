@@ -1,0 +1,222 @@
+PROGRAM PRACTICA3
+IMPLICIT NONE
+REAL(kind=8)::W,R,NOR1,NOR2
+REAL(kind=8),DIMENSION(:,:),ALLOCATABLE::A,L,U,D,E,F,G,H,M,ITER
+REAL(kind=8),DIMENSION(:),ALLOCATABLE::X0,X,Y,B
+INTEGER::OPCION,I,J,K,N,ITERS,MAXIT=100
+LOGICAL::CONVERGED
+
+PRINT*,''
+PRINT*,'*************** MENU ***************'
+PRINT*,'ELIGE UNA DE LAS SIGUIENTES OPCIONES:'
+PRINT*,''
+PRINT*,'1.- FACTORIZACION LU'
+PRINT*,'2.- METODO DE RELAJACION'
+PRINT*,'3.- SALIR'
+PRINT*,'*************************************'
+
+READ*,OPCION
+OPEN(UNIT=1,FILE='entrada.txt')
+REWIND(1)
+SELECT CASE (OPCION)
+CASE(1)
+   READ(1,*) N
+   ALLOCATE(A(N,N))
+   ALLOCATE(L(N,N))
+   ALLOCATE(U(N,N))
+   ALLOCATE(X(N))
+   ALLOCATE(Y(N))
+   ALLOCATE(B(N))
+   DO I=1,N
+   READ(1,*) (A(I,J),J=1,N)
+   END DO
+   DO I=1,N
+   READ(1,*) B(I)
+   END DO
+   CALL LU   
+   CALL DESCENSO
+   CALL REMONTE
+
+CASE(2)
+   READ(1,*) N
+   ALLOCATE(A(N,N))
+   ALLOCATE(D(N,N))
+   ALLOCATE(E(N,N))
+   ALLOCATE(F(N,N))
+   ALLOCATE(G(N,N))
+   ALLOCATE(H(N,N))
+   ALLOCATE(M(N,N))
+   ALLOCATE(ITER(MAXIT,N))
+   ALLOCATE(X(N))
+   ALLOCATE(X0(N))
+   ALLOCATE(Y(N))
+   ALLOCATE(B(N))
+   DO I=1,N
+   READ(1,*) (A(I,J),J=1,N)
+   END DO
+   DO I=1,N
+   READ(1,*) B(I)
+   END DO
+   READ(1,*) W
+   DO I=1,N
+   READ(1,*) X0(I)
+   END DO
+   CALL RELAJACION
+CASE DEFAULT 
+   STOP
+END SELECT
+
+OPEN(UNIT=2,FILE='salida.txt')
+REWIND(2)
+WRITE(2,*) 'DIMENSION= ',N
+WRITE(2,*) 'A= '
+DO I=1,N
+ WRITE(2,*) (A(I,J),J=1,N)
+END DO
+WRITE(2,*) ''
+WRITE(2,*) 'B= '
+DO I=1,N
+WRITE(2,'(F20.14,1X)') B(I)
+END DO
+IF (OPCION==2) THEN
+WRITE(2,*) 'W= ', W
+WRITE(2,*) 'X0= '
+DO I=1,N
+WRITE(2,'(F20.14,1X)') X0(I)
+END DO
+END IF
+WRITE(2,*) 'La solucion es X= '
+PRINT*,'La solucion es: ' 
+DO I=1,N
+PRINT*,X(I)
+WRITE(2,'(F20.14,1X)') X(I)
+END DO
+CLOSE(2)
+DEALLOCATE(A,B,X,Y)
+IF (OPCION==1) DEALLOCATE(L,U)
+IF (OPCION==2) DEALLOCATE(X0,D,E,F,G,H,M)
+
+CONTAINS
+
+SUBROUTINE LU
+
+DO J=1,N
+  DO I=1,N
+      L(I,J)=0;
+      U(I,J)=0;
+  END DO
+  L(J,J)=1.0_8
+END DO
+
+DO I=1,N
+ DO J=I,N
+  R=0
+  DO K=1,I-1
+     R=R+(L(I,K)*U(K,J))
+  END DO
+   U(I,J)=A(I,J)-R 
+ END DO
+ DO J=1,I
+  IF (I/=N)THEN
+   R=0
+   DO K=1,J-1
+     R=R+(L(I+1,K)*U(K,J))
+   END DO
+   L(I+1,J)=(A(I+1,J)-R)/U(J,J)
+  END IF
+ END DO
+END DO
+
+END SUBROUTINE LU
+
+
+SUBROUTINE DESCENSO	
+
+DO I=1,N
+ Y(I)=B(I)
+ DO J=1,(I-1)
+  Y(I)=Y(I)-L(I,J)*Y(J)
+ END DO
+END DO
+
+END SUBROUTINE DESCENSO
+
+
+SUBROUTINE REMONTE
+
+DO I=N,1,-1
+ X(I)=Y(I)/U(I,I)
+ DO J=N,I+1,-1 
+  X(I)=X(I)-((U(I,J)*X(J))/U(I,I))
+ END DO
+END DO
+
+END SUBROUTINE REMONTE 
+
+SUBROUTINE RELAJACION
+
+DO I=1,N
+ DO J=1,N
+   D(I,J)=0
+   F(I,J)=0
+   E(I,J)=0
+   G(I,J)=0
+   H(I,J)=0
+ END DO
+ D(I,I)=A(I,I)
+END DO 
+
+DO I=1,N
+ DO J=1,N
+   IF (I<J) E(J,I) = -A(J,I)
+   IF (J>I) F(I,J) = -A(I,J)
+ END DO
+END DO
+
+DO I=1,N
+ DO J=1,N
+  G(I,J)=(D(I,J)/W)-E(I,J)
+  H(I,J)=(((1-W)/W)*D(I,J)) + F(I,J) 
+ END DO
+END DO
+
+DO I=1,N
+ X(I)=X0(I)
+END DO
+
+DO ITERS=1,MAXIT
+
+R=0
+DO I=1,N
+ IF (I>1) R=G(I,1)*X(J)
+ DO J=2,I
+  R=R+(X(J)*G(I,J))
+ END DO
+ DO J=1,N
+  ITER(ITERS,J)=(((H(I,J)*X(J))+B(J))-R)/G(J,J)
+ END DO
+END DO 
+
+NOR1=0
+DO I=1,N
+NOR1=NOR1+ITER(ITERS,I)**2
+END DO
+
+NOR2=0
+DO I=1,N
+NOR2=NOR2+X(I)**2
+END DO
+
+CONVERGED=(ABS((SQRT(NOR1)-SQRT(NOR2))/SQRT(NOR1))<1E-9)
+DO I=1,N
+ X(I)=ITER(ITERS,I)
+END DO
+IF (CONVERGED) EXIT
+
+END DO
+
+END SUBROUTINE RELAJACION
+
+
+
+END PROGRAM
